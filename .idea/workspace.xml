@@ -5,9 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="fbcfea6e-369b-4b89-b832-eddbc3035714" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/cmd/api/healthcheck.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/cmd/api/helpers.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/cmd/api/movies.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/cmd/api/routes.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmd/api/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/api/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -43,7 +46,7 @@
     "RunOnceActivity.go.modules.automatic.dependencies.download": "true",
     "RunOnceActivity.go.modules.go.list.on.any.changes.was.set": "true",
     "WebServerToolWindowFactoryState": "false",
-    "git-widget-placeholder": "02-02-basic-web-server",
+    "git-widget-placeholder": "main",
     "go.import.settings.migrated": "true",
     "last_opened_file_path": "C:/Users/lazar/Documents/GoLang [PORTFOLIO]/lets-go",
     "node.js.detected.package.eslint": "true",
