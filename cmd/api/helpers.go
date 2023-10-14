@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/julienschmidt/httprouter"
 	"net/http"
@@ -18,4 +19,26 @@ func (app *application) readIDParam(r *http.Request) (int64, error) {
 	}
 
 	return id, nil
+}
+
+func (app *application) writeJSON(w http.ResponseWriter, status int, data any, headers http.Header) error {
+	// podaci se enkodiraju u JSON:
+	js, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	// dodavanje novog reda, ali čisto radi kozmetike u terminalu:
+	js = append(js, '\n')
+
+	// prelaz preko "header" mape iz parametra i dodavanje svakog "header"-a u "http.ResponseWriter header" mapu:
+	for key, value := range headers {
+		w.Header()[key] = value
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	w.Write(js)
+
+	return nil
 }

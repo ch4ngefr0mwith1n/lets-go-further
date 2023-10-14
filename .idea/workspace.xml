@@ -7,6 +7,7 @@
     <list default="true" id="fbcfea6e-369b-4b89-b832-eddbc3035714" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cmd/api/healthcheck.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/api/healthcheck.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/api/helpers.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/api/helpers.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,7 +43,7 @@
     "RunOnceActivity.go.modules.automatic.dependencies.download": "true",
     "RunOnceActivity.go.modules.go.list.on.any.changes.was.set": "true",
     "WebServerToolWindowFactoryState": "false",
-    "git-widget-placeholder": "03-01-fixed-format-json",
+    "git-widget-placeholder": "03-02-json-encoding",
     "go.import.settings.migrated": "true",
     "last_opened_file_path": "C:/Users/lazar/Documents/GoLang [PORTFOLIO]/lets-go",
     "node.js.detected.package.eslint": "true",
