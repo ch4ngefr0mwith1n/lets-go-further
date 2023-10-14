@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	validator "greenlight.lazarmrkic.com/internal"
 	"greenlight.lazarmrkic.com/internal/data"
 	"net/http"
 	"time"
@@ -11,10 +12,10 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 	// deklarisanje anonimnog "struct"-a, u njega će se dekodirati "HTTP request body":
 	var input struct {
 		// "tag"-ovi moraju da se poklapaju sa poljima u JSON-u:
-		Title   string   `json:"title"`
-		Year    int32    `json:"year"`
-		Runtime int32    `json:"runtime"`
-		Genres  []string `json:"genres"`
+		Title   string       `json:"title"`
+		Year    int32        `json:"year"`
+		Runtime data.Runtime `json:"runtime"`
+		Genres  []string     `json:"genres"`
 	}
 
 	// stari pristup za dekodiranje:
@@ -26,7 +27,21 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	fmt.Fprintf(w, "%+v\n")
+	// kopiranje vrijednosti iz "input" struct-a u "movie" struct, kako bismo pristupili metodi za validaciju:
+	movie := &data.Movie{
+		Title:   input.Title,
+		Year:    input.Year,
+		Runtime: input.Runtime,
+		Genres:  input.Genres,
+	}
+
+	v := validator.New()
+	if data.ValidateMovie(v, movie); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	fmt.Fprintf(w, "%+v\n", input)
 }
 
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
