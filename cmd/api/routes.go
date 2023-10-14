@@ -5,12 +5,20 @@ import (
 	"net/http"
 )
 
-func (app *application) routes() *httprouter.Router {
+// povratna vrijednost mora da bude "http.Handler":
+func (app *application) routes() http.Handler {
 	router := httprouter.New()
 
+	// "router" takođe treba da šalje grešku ukoliko ne može da pronađe odgovarajuću rutu
+	// tu trebamo da stavimo iste "JSON response"-ove, ali oni moraju da zadovoljavaju "http.Handler" interfejs
+	// zbog toga, mora da se odradi konverzije
+	router.NotFound = http.HandlerFunc(app.notFoundResponse)
+	router.MethodNotAllowed = http.HandlerFunc(app.methodNotAllowedResponse)
+
+	// sada moramo sa "middleware"-om da "omotamo" svaku rutu:
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.healthcheckHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/movies", app.createMovieHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/movies/:id", app.showMovieHandler)
 
-	return router
+	return app.recoverPanic(router)
 }
