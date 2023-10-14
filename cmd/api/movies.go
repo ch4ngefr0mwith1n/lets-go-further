@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"greenlight.lazarmrkic.com/internal/data"
 	"net/http"
@@ -8,7 +9,24 @@ import (
 )
 
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "create a new movie")
+	// deklarisanje anonimnog "struct"-a, u njega će se dekodirati "HTTP request body":
+	var input struct {
+		// "tag"-ovi moraju da se poklapaju sa poljima u JSON-u:
+		Title   string   `json:"title"`
+		Year    int32    `json:"year"`
+		Runtime int32    `json:"runtime"`
+		Genres  []string `json:"genres"`
+	}
+
+	// dekodiranje:
+	// prvo se "HTTP request body" učitava, a nakon toga se preko "Decode()" metode ubacuje u "struct"
+	err := json.NewDecoder(r.Body).Decode(&input)
+	if err != nil {
+		app.errorResponse(w, r, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	fmt.Fprintf(w, "%+v\n")
 }
 
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
