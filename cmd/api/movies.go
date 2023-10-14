@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"greenlight.lazarmrkic.com/internal/data"
 	"net/http"
@@ -18,11 +17,12 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 		Genres  []string `json:"genres"`
 	}
 
-	// dekodiranje:
-	// prvo se "HTTP request body" učitava, a nakon toga se preko "Decode()" metode ubacuje u "struct"
-	err := json.NewDecoder(r.Body).Decode(&input)
+	// stari pristup za dekodiranje:
+	//err := json.NewDecoder(r.Body).Decode(&input)
+	// novi pristup:
+	err := app.readJSON(w, r, &input)
 	if err != nil {
-		app.errorResponse(w, r, http.StatusBadRequest, err.Error())
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
