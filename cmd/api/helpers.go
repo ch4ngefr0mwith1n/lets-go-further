@@ -21,9 +21,27 @@ func (app *application) readIDParam(r *http.Request) (int64, error) {
 	return id, nil
 }
 
-func (app *application) writeJSON(w http.ResponseWriter, status int, data any, headers http.Header) error {
-	// podaci se enkodiraju u JSON:
-	js, err := json.Marshal(data)
+// "envelope" pristup sa JSON-om, ukoliko želimo da prikažemo "parent" objekat kao "top-level" u JSON-u:
+//
+//	{
+//	   "movie": {
+//	       "id": 123,
+//	       "title": "Casablanca",
+//	       "runtime": 102,
+//	       "genres": [
+//	           "drama",
+//	           "romance",
+//	           "war"
+//	       ],
+//	       "version":1
+//	   }
+//	}
+type envelope map[string]any
+
+func (app *application) writeJSON(w http.ResponseWriter, status int, data envelope, headers http.Header) error {
+	// podaci se enkodiraju u JSON (samo "json.Marshal" je dovoljan za ovo)
+	// prilikom formatiranja, koristiće se samo "tab indent" za svaki element (neće biti "line prefix"-a)
+	js, err := json.MarshalIndent(data, "", "\t")
 	if err != nil {
 		return err
 	}
