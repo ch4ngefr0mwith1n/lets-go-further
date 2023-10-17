@@ -19,7 +19,7 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	// stari pristup za dekodiranje:
-	//err := json.NewDecoder(r.Body).Decode(&input)
+	// err := json.NewDecoder(r.Body).Decode(&input)
 	// novi pristup:
 	err := app.readJSON(w, r, &input)
 	if err != nil {
@@ -41,7 +41,25 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	fmt.Fprintf(w, "%+v\n", input)
+	// nakon poziva "Insert()" metode, takođe se prosljeđuje "pointer" ka validiranom "movie" struct-u
+	// ovo će kreirati novi upis u bazu, a biće odrađeno i AŽURIRANJE tri polja unutar struct-a sa generisanim informacijama
+	err = app.models.Movies.Insert(movie)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// kada šaljemo HTTP response, onda unutar njega šaljemo i "Location" header
+	// unutar njega će biti URL na kom mogu da nađu resurs koji je upravo kreiran
+	// prvo se pravi prazna HTTP "header" mapa, a nakon toga dodajemo novi "Location" header
+	headers := make(http.Header)
+	headers.Set("Location", fmt.Sprintf("/v1/movies/%id", movie.ID))
+
+	// sada se upisuju vrijednosti u JSON odgovor sa HTTP 201 kodom, skupa sa "Location" header-om:
+	err = app.writeJSON(w, http.StatusCreated, envelope{"movie": movie}, headers)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
 }
 
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {

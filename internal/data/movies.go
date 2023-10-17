@@ -2,6 +2,7 @@ package data
 
 import (
 	"database/sql"
+	"github.com/lib/pq"
 	validator "greenlight.lazarmrkic.com/internal"
 	"time"
 )
@@ -23,8 +24,22 @@ type MovieModel struct {
 	DB *sql.DB
 }
 
+// "Insert" metoda prima "*Movie" pointer, pa se nakon poziva "Scan()" metode ažuriraju vrijednosti na lokaciji na koju pointer pokazuje
 func (m MovieModel) Insert(movie *Movie) error {
-	return nil
+	query := `
+        INSERT INTO movies (title, year, runtime, genres) 
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, created_at, version`
+
+	// ovdje će biti definisane vrijednosti koje idu u "placeholder" parametre
+	// BITNO:
+	// niz žanrova će biti ubačen preko "pq.Array()"
+	// preko ove metode možemo da ubacujemo i ostale nizove različitih tipova (bool, byte, int32, int64,...)
+	args := []any{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
+
+	// koristi se "QueryRow()" jer nam upit vraća jedan red podataka
+	// naš "INSERT" treba da vrati tri reda - "ID" / "CreatedAt" i "Version"
+	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
 func (m MovieModel) Get(id int64) (*Movie, error) {
