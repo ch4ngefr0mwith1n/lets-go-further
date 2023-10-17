@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	// importuje se "pq" drajver, kako bi bio registrovan sa "database/sql" paketom
 	// underscore "_" se koristi da se Golang kompajler ne bi žalio
 	_ "github.com/lib/pq"
