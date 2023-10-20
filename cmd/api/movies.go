@@ -89,6 +89,8 @@ func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+// "updateMovie()" handler će biti ažuriran tako da podržava "djelimične" apdejte vezane za "movie" zapise
+// ovaj proces je malo komplikovaniji od "complete replacement" pristupa ranije
 func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil {
@@ -109,11 +111,13 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	// "input" struct čuva podatke koji se očekuju od klijenta
+	// kako bismo izbjegli rad sa "default" vrijednostima tipova (recimo, "" za stringove / "0" za brojne tipove itd.)
+	// uvešćemo "pointer"-e kao tipove jer je njihova "default" vrijednost "null"
 	var input struct {
-		Title   string       `json:"title"`
-		Year    int32        `json:"year"`
-		Runtime data.Runtime `json:"runtime"`
-		Genres  []string     `json:"genres"`
+		Title   *string       `json:"title"`
+		Year    *int32        `json:"year"`
+		Runtime *data.Runtime `json:"runtime"`
+		Genres  []string      `json:"genres"` // nizove nema potrebe da modifikujemo, oni su referentni tip
 	}
 
 	// upisivanje vrijednosti iz klijentskog JSON-a u "input" struct:
@@ -124,10 +128,21 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	// kopiranje vrijednosti iz "request body"-ja u odgovarajuća polja "movie" zapisa iz baze
-	movie.Title = input.Title
-	movie.Year = input.Year
-	movie.Runtime = input.Runtime
-	movie.Genres = input.Genres
+	// ukoliko bilo koje od navedenih polja ima "nil" vrijednost, onda preskačemo upisivanje vrijednosti
+	// BITNO:
+	// pošto radimo sa "pointer"-ima, prvo moramo da ih dereferenciramo preko "*" operatora
+	if input.Title != nil {
+		movie.Title = *input.Title
+	}
+	if input.Year != nil {
+		movie.Year = *input.Year
+	}
+	if input.Runtime != nil {
+		movie.Runtime = *input.Runtime
+	}
+	if input.Genres != nil {
+		movie.Genres = input.Genres // nema potrebe da derefenciramo "slice"
+	}
 
 	// validacija ažuriranog zapisa iz baze
 	// ukoliko ona ne prođe - biće poslat "422 Unprocessable Entity" odgovor
