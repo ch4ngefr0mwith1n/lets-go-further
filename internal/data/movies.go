@@ -84,8 +84,30 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 	return &movie, nil
 }
 
+// prilikom ažuriranja vrijednosti za "Movie" objekat, "id" i "createdAt" ne trebaju da budu modifikovani
+// klijent ne treba da pristupa "version" polju
+// međutim,u našem slučaju ćemo ipak mijenjati sve navedene vrijednosti
 func (m MovieModel) Update(movie *Movie) error {
-	return nil
+	// nakon izvršavanja "query"-ja, "version" će biti uvećana za 1:
+	query := `
+        UPDATE movies 
+        SET title = $1, year = $2, runtime = $3, genres = $4, version = version + 1
+        WHERE id = $5
+        RETURNING version`
+
+	// "slice" sa vrijednostima za "placeholder" parametre:
+	args := []any{
+		movie.Title,
+		movie.Year,
+		movie.Runtime,
+		pq.Array(movie.Genres),
+		movie.ID,
+	}
+
+	//
+	// povratna vrijednost za "Version" iz query-ja će biti učitana u "Movie" struct
+	// njegova vrijednost će biti izmijenjena zbog "movie *Movie" iz potpisa metoda
+	return m.DB.QueryRow(query, args...).Scan(&movie.Version)
 }
 
 func (m MovieModel) Delete(id int64) error {
