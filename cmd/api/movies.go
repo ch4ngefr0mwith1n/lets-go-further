@@ -1,11 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	validator "greenlight.lazarmrkic.com/internal"
 	"greenlight.lazarmrkic.com/internal/data"
 	"net/http"
-	"time"
 )
 
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
@@ -70,13 +70,16 @@ func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	movie := data.Movie{
-		ID:        id,
-		CreatedAt: time.Now(),
-		Title:     "Casablanca",
-		Runtime:   102,
-		Genres:    []string{"drama", "romance", "war"},
-		Version:   1,
+	movie, err := app.models.Movies.Get(id)
+	if err != nil {
+		switch {
+		// ukoliko se desi "data.ErrRecordNotFound", onda šaljemo "404 Not Found" ka klijentu
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
 	}
 
 	// ubacivanje "envelope{"movie": movie}" instance:

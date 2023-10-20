@@ -2,6 +2,7 @@ package data
 
 import (
 	"database/sql"
+	"errors"
 	"github.com/lib/pq"
 	validator "greenlight.lazarmrkic.com/internal"
 	"time"
@@ -43,7 +44,42 @@ func (m MovieModel) Insert(movie *Movie) error {
 }
 
 func (m MovieModel) Get(id int64) (*Movie, error) {
-	return nil, nil
+	// "ID" je "bigserial" tipa, paće unutar baze da se odrađuje "autoincrement"
+	// nikada neće imati vrijednost manju od "1"
+	if id < 1 {
+		return nil, ErrRecordNotFound
+	}
+
+	query := `
+        SELECT id, created_at, title, year, runtime, genres, version
+        FROM movies
+        WHERE id = $1`
+
+	// unutar ovog "struct"-a će se čuvati podaci vraćeni iz baze:
+	var movie Movie
+
+	// vratiće se samo jedan red iz tabele, pa zbog toga koristimo "QueryRow":
+	err := m.DB.QueryRow(query, id).Scan(
+		&movie.ID,
+		&movie.CreatedAt,
+		&movie.Title,
+		&movie.Year,
+		&movie.Runtime,
+		// mora da se koristi "pq.Array()", jer se skenira "text[]" niz:
+		pq.Array(&movie.Genres),
+		&movie.Version,
+	)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &movie, nil
 }
 
 func (m MovieModel) Update(movie *Movie) error {
