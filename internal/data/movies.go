@@ -111,6 +111,32 @@ func (m MovieModel) Update(movie *Movie) error {
 }
 
 func (m MovieModel) Delete(id int64) error {
+	if id < 1 {
+		return ErrRecordNotFound
+	}
+
+	query := `
+        DELETE FROM movies
+        WHERE id = $1`
+
+	// koristimo "Exec()" metodu jer se nakon brisanja neće vratiti nijedan red
+	// međutim, ova metoda vraća "sql.Result" objekat (sadrži broj redova na koje je "query" uticao)
+	result, err := m.DB.Exec(query, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	// ukoliko "query" nije uticao ni na jedan red, onda "movies" tabela nije sadržala zapis sa datim "ID"-em
+	// u tom slučaju ćemo vratiti grešku
+	if rowsAffected == 0 {
+		return ErrRecordNotFound
+	}
+
 	return nil
 }
 
