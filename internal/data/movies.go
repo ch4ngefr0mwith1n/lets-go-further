@@ -43,6 +43,8 @@ func (m MovieModel) Insert(movie *Movie) error {
 	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
+// koristimo "int64" iako "ID" nikada ne treba da bude negativan
+// prva opcija bi bila "uint", ali PostgreSQL unutar sebe nema "unsigned integers"
 func (m MovieModel) Get(id int64) (*Movie, error) {
 	// "ID" je "bigserial" tipa, paće unutar baze da se odrađuje "autoincrement"
 	// nikada neće imati vrijednost manju od "1"
