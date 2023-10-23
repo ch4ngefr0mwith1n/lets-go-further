@@ -201,3 +201,35 @@ func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Reques
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request) {
+	// unutar ovog "struct"-a će se čuvati očekivane vrijednosti iz "request query string"-a:
+	var input struct {
+		Title  string
+		Genres []string
+		// ubacivanje "Filters" struct-a ("page" / "page_size" i "sort")
+		data.Filters
+	}
+
+	v := validator.New()
+	// "url.Values" mapa, koja sadrži "query string" podatke
+	qs := r.URL.Query()
+
+	input.Title = app.readString(qs, "title", "")
+	input.Genres = app.readCSV(qs, "genres", []string{})
+	// podrazumijevana vrijednost za "page_value" je 1, a za "page_size" je 20
+	// treći argument koji prosljeđujemo je instanca "validator"-a
+	input.Filters.Page = app.readInt(qs, "page", 1, v)
+	input.Filters.PageSize = app.readInt(qs, "page_size", 20, v)
+	// podrazumijevana vrijednost za sortiranje je "id" (ascending sortiranje preko "movie ID"-a)
+	input.Filters.Sort = app.readString(qs, "sort", "id")
+
+	// provjera da li ima grešaka u "Validator" instanci
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	// ubacivanje sadržaja "input" struct-a u HTTP response
+	fmt.Fprintf(w, "%+v\n", input)
+}
