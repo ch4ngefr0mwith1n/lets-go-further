@@ -5,9 +5,11 @@ import (
 	"errors"
 )
 
-// ovaj tip greške za sada koristimo kada "Get()" metoda pokušava da nađe film koji nije u bazi
 var (
+	// ovaj tip greške za sada koristimo kada "Get()" metoda pokušava da nađe film koji nije u bazi
 	ErrRecordNotFound = errors.New("record not found")
+	// u slučaju "data race" konflikta:
+	ErrEditConflict = errors.New("edit conflict")
 )
 
 // unutar ovog "struct"-a ćemo čuvati sve modele
