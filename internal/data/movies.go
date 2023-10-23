@@ -88,11 +88,17 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 // klijent ne treba da pristupa "version" polju
 // međutim,u našem slučaju ćemo ipak mijenjati sve navedene vrijednosti
 func (m MovieModel) Update(movie *Movie) error {
-	// nakon izvršavanja "query"-ja, "version" će biti uvećana za 1:
+	// nakon izvršavanja "query"-ja, "version" će biti uvećana za 1
+	// BITNO - DATA RACE CONDITION:
+	// dešava se kada dva klijenta pokušavaju da ažuriraju isti red u isto vrijeme
+	// odnosno, imaćemo dvije "goroutine" i prva treba da uspije, dok druga treba da baci "error"
+	//
+	// u našem slučaju, ažuriranje će biti odrađeno jedino ukoliko "version number" još uvijek ima vrijednost "N"
+	// ukoliko je vrijednost u međuvremenu izmijenjena - onda se "update" neće izvršiti i klijent će dobiti "error"
 	query := `
         UPDATE movies 
         SET title = $1, year = $2, runtime = $3, genres = $4, version = version + 1
-        WHERE id = $5
+        WHERE id = $5 AND version = $6
         RETURNING version`
 
 	// "slice" sa vrijednostima za "placeholder" parametre:
@@ -102,12 +108,24 @@ func (m MovieModel) Update(movie *Movie) error {
 		movie.Runtime,
 		pq.Array(movie.Genres),
 		movie.ID,
+		movie.Version,
 	}
 
-	//
 	// povratna vrijednost za "Version" iz query-ja će biti učitana u "Movie" struct
 	// njegova vrijednost će biti izmijenjena zbog "movie *Movie" iz potpisa metoda
-	return m.DB.QueryRow(query, args...).Scan(&movie.Version)
+	//
+	// ukoliko prilikom upita ne možemo da pronađemo red u tabeli, onda znamo da je on ili izbrisan ili se verzija u međuvremenu izmjenila
+	// u tom slučaju vraćamo "ErrEditConflict"
+	err := m.DB.QueryRow(query, args...).Scan(&movie.Version)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			return err
+		}
+	}
+	return nil
 }
 
 func (m MovieModel) Delete(id int64) error {
