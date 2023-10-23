@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/julienschmidt/httprouter"
+	validator "greenlight.lazarmrkic.com/internal"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -149,4 +151,45 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any
 	}
 
 	return nil
+}
+
+// metoda koja vraća "string" vrijednost iz "query string"-a ili vraća "default" vrijednost
+// "qs" predstavlja "query string"
+func (app *application) readString(qs url.Values, key string, defaultValue string) string {
+	// vrijednost koja je uvezana sa ključem mape ("key" parametar)
+	s := qs.Get(key)
+	// ukoliko on ne postoji, vraća se prazan string
+	if s == "" {
+		return defaultValue
+	}
+
+	return s
+}
+
+// ova metoda učitava neku string vrijednost iz "query string"-a, a nakon toga odrađuje "split" preko "," karaktera
+// rezultat će biti "slice"
+func (app *application) readCSV(qs url.Values, key string, defaultValue []string) []string {
+	csv := qs.Get(key)
+	if csv == "" {
+		return defaultValue
+	}
+
+	return strings.Split(csv, ",")
+}
+
+// ova metoda učitava "string" vrijednost iz "query string"-a i pretvara u "integer"
+func (app *application) readInt(qs url.Values, key string, defaultValue int, v *validator.Validator) int {
+	s := qs.Get(key)
+	if s == "" {
+		return defaultValue
+	}
+
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		// dodatak - ukoliko konverzija iz "string" u "int" ne uspije, dodaće se "error message" u "Validator" instanci
+		v.AddError(key, "must be an integer value")
+		return defaultValue
+	}
+
+	return i
 }
