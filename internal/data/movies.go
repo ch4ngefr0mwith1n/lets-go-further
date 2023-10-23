@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"github.com/lib/pq"
@@ -25,33 +26,16 @@ type MovieModel struct {
 	DB *sql.DB
 }
 
-// "Insert" metoda prima "*Movie" pointer, pa se nakon poziva "Scan()" metode ažuriraju vrijednosti na lokaciji na koju pointer pokazuje
-func (m MovieModel) Insert(movie *Movie) error {
-	query := `
-        INSERT INTO movies (title, year, runtime, genres) 
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, created_at, version`
-
-	// ovdje će biti definisane vrijednosti koje idu u "placeholder" parametre
-	// BITNO:
-	// niz žanrova će biti ubačen preko "pq.Array()"
-	// preko ove metode možemo da ubacujemo i ostale nizove različitih tipova (bool, byte, int32, int64,...)
-	args := []any{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
-
-	// koristi se "QueryRow()" jer nam upit vraća jedan red podataka
-	// naš "INSERT" treba da vrati tri reda - "ID" / "CreatedAt" i "Version"
-	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
-}
-
 // koristimo "int64" iako "ID" nikada ne treba da bude negativan
 // prva opcija bi bila "uint", ali PostgreSQL unutar sebe nema "unsigned integers"
 func (m MovieModel) Get(id int64) (*Movie, error) {
-	// "ID" je "bigserial" tipa, paće unutar baze da se odrađuje "autoincrement"
+	// "ID" je "bigserial" tipa, pa će unutar baze da se odrađuje "autoincrement"
 	// nikada neće imati vrijednost manju od "1"
 	if id < 1 {
 		return nil, ErrRecordNotFound
 	}
 
+	// "pg_sleep" će simulirati kašnjenje pri radu sa bazom
 	query := `
         SELECT id, created_at, title, year, runtime, genres, version
         FROM movies
@@ -60,8 +44,18 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 	// unutar ovog "struct"-a će se čuvati podaci vraćeni iz baze:
 	var movie Movie
 
-	// vratiće se samo jedan red iz tabele, pa zbog toga koristimo "QueryRow":
-	err := m.DB.QueryRow(query, id).Scan(
+	// biće kreiran "context.Context" objekat koji nosi "timeout" rok od 3 sekunde
+	// prazan "context.Background()" će služiti kao "parent" context
+	//
+	// "timeout" počinje kada se kontekst objekat kreira preko "context.WithTimeout()" metode
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	// koristimo "defer" kako bi se ugasio "context" objekat prije nego što "Get" metoda vrati vrijednost
+	// bez "defer"-a, resursi neće biti oslobođeni sve dok ne dođe do "3-second-timeout"-a ili dok ne pukne "parent" context
+	defer cancel()
+
+	// ranije smo koristili "QueryRow()" metodu jer se vraća samo jedan red iz tabele
+	// sada nam je potrebna "QueryRowContext()" metoda jer moramo da postavimo "context" sa "timeout"-om
+	err := m.DB.QueryRowContext(ctx, query, id).Scan(
 		&movie.ID,
 		&movie.CreatedAt,
 		&movie.Title,
@@ -82,6 +76,27 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 	}
 
 	return &movie, nil
+}
+
+// "Insert" metoda prima "*Movie" pointer, pa se nakon poziva "Scan()" metode ažuriraju vrijednosti na lokaciji na koju pointer pokazuje
+func (m MovieModel) Insert(movie *Movie) error {
+	query := `
+        INSERT INTO movies (title, year, runtime, genres) 
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, created_at, version`
+
+	// ovdje će biti definisane vrijednosti koje idu u "placeholder" parametre
+	// BITNO:
+	// niz žanrova će biti ubačen preko "pq.Array()"
+	// preko ove metode možemo da ubacujemo i ostale nizove različitih tipova (bool, byte, int32, int64,...)
+	args := []any{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// koristi se "QueryRow()" jer nam upit vraća jedan red podataka
+	// naš "INSERT" treba da vrati tri reda - "ID" / "CreatedAt" i "Version"
+	return m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
 // prilikom ažuriranja vrijednosti za "Movie" objekat, "id" i "createdAt" ne trebaju da budu modifikovani
@@ -111,12 +126,15 @@ func (m MovieModel) Update(movie *Movie) error {
 		movie.Version,
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	// povratna vrijednost za "Version" iz query-ja će biti učitana u "Movie" struct
 	// njegova vrijednost će biti izmijenjena zbog "movie *Movie" iz potpisa metoda
 	//
 	// ukoliko prilikom upita ne možemo da pronađemo red u tabeli, onda znamo da je on ili izbrisan ili se verzija u međuvremenu izmjenila
 	// u tom slučaju vraćamo "ErrEditConflict"
-	err := m.DB.QueryRow(query, args...).Scan(&movie.Version)
+	err := m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.Version)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -137,9 +155,12 @@ func (m MovieModel) Delete(id int64) error {
         DELETE FROM movies
         WHERE id = $1`
 
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	// koristimo "Exec()" metodu jer se nakon brisanja neće vratiti nijedan red
 	// međutim, ova metoda vraća "sql.Result" objekat (sadrži broj redova na koje je "query" uticao)
-	result, err := m.DB.Exec(query, id)
+	result, err := m.DB.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
