@@ -110,9 +110,15 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// How do we tell the difference between:
+	// A client providing a key/value pair which has a zero-value value — like {"title": ""} — in which case we want to return a validation error.
+	// A client not providing a key/value pair in their JSON at all — in which case we want to ‘skip’ updating the field but not send a validation error.
+	//
 	// "input" struct čuva podatke koji se očekuju od klijenta
 	// kako bismo izbjegli rad sa "default" vrijednostima tipova (recimo, "" za stringove / "0" za brojne tipove itd.)
 	// uvešćemo "pointer"-e kao tipove jer je njihova "default" vrijednost "null"
+	// ukoliko klijent šalje određeni "key:value" par preko JSON-a, onda samo provjerimo da li je odgovarajuće polje
+	// unutar "input" struct-a "nil" ili nije
 	var input struct {
 		Title   *string       `json:"title"`
 		Year    *int32        `json:"year"`
