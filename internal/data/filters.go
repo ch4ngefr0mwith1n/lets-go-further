@@ -2,6 +2,7 @@ package data
 
 import (
 	validator "greenlight.lazarmrkic.com/internal"
+	"math"
 	"strings"
 )
 
@@ -13,6 +14,15 @@ type Filters struct {
 	Sort     string
 	// dodajemo podržane vrijednosti za sortiranje ("id", "title", "year", "runtime", "-id", "-title", "-year", "-runtime")
 	SortSafeList []string
+}
+
+// ovaj "struct" će sadržati "pagination" metadada:
+type Metadata struct {
+	CurrentPage  int `json:"current_page,omitempty"`
+	PageSize     int `json:"page_size,omitempty"`
+	FirstPage    int `json:"first_page,omitempty"`
+	LastPage     int `json:"last_page,omitempty"`
+	TotalRecords int `json:"total_records,omitempty"`
 }
 
 func ValidateFilters(v *validator.Validator, f Filters) {
@@ -55,4 +65,20 @@ func (f Filters) limit() int {
 
 func (f Filters) offset() int {
 	return (f.Page - 1) * f.PageSize
+}
+
+func calculateMetadata(totalRecords int, page int, pageSize int) Metadata {
+	if totalRecords == 0 {
+		return Metadata{}
+	}
+
+	return Metadata{
+		CurrentPage: page,
+		PageSize:    pageSize,
+		FirstPage:   1,
+		// recimo da imamo situaciju gdje postoji 12 "totalRecords" i gdje "pageSize" ima vrijednost 5:
+		// math.Ceil(12/5) = 3
+		LastPage:     int(math.Ceil(float64(totalRecords) / float64(pageSize))),
+		TotalRecords: totalRecords,
+	}
 }

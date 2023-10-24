@@ -182,7 +182,7 @@ func (m MovieModel) Delete(id int64) error {
 
 // ova metoda će vraćati "Movie" slice
 // ona će da prihvata razne "filter" parametre, iako ih na početku nećemo koristiti
-func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
+func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
 	// oba filtera će biti "optional" ('' ili '{}')
 	// "@>" predstavlja "contained by" operator u PostgreSQL
 	//
@@ -199,8 +199,10 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 	//
 	// "LIMIT" - predstavlja maksimalan broj redova koje upit treba da vrati
 	// "OFFSET" - preskače određeni broj redova prije nego što se redovi iz trenutnog upita vrate
+	//
+	// "window" funkcija vraća ukupan broj (isfiltriranih) redova
 	query := fmt.Sprintf(`
-        SELECT id, created_at, title, year, runtime, genres, version
+        SELECT count(*) OVER(), id, created_at, title, year, runtime, genres, version
         FROM movies
         WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
         AND (genres @> $2 OR $2 = '{}')     
@@ -217,11 +219,13 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 	// u ovu metodu će se proslijediti "variadic" parametar "args"
 	rows, err := m.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		// ukoliko se desi greška, vratiće se i prazan "Metadata" struct
+		return nil, Metadata{}, err
 	}
 
 	defer rows.Close()
 
+	totalRecords := 0
 	// prazan "slice" koji će sadržati filmove:
 	movies := []*Movie{}
 
@@ -232,6 +236,7 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 
 		// vrijednosti iz SQL reda se ubacuju u "Movie" struct
 		err := rows.Scan(
+			&totalRecords, // ubacuje se vrijednost "count"-a iz "window" funkcije
 			&movie.ID,
 			&movie.CreatedAt,
 			&movie.Title,
@@ -242,7 +247,7 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 		)
 
 		if err != nil {
-			return nil, err
+			return nil, Metadata{}, err
 		}
 
 		movies = append(movies, &movie)
@@ -250,10 +255,12 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 
 	// nakon završetka "rows.Next()" petlje, poziva se "rows.Err()" kako bi se vratila greška ukoliko je došlo do nje
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 
-	return movies, nil
+	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
+
+	return movies, metadata, nil
 }
 
 func ValidateMovie(v *validator.Validator, movie *Movie) {
