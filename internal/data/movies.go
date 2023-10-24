@@ -196,19 +196,26 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 	// input.Genres = app.readCSV(qs, "genres", []string{})
 	//
 	// interpolacija SQL upita za sortiranje po zadatoj koloni po zadatom redoslijedu ("ASC"/"DESC")
+	//
+	// "LIMIT" - predstavlja maksimalan broj redova koje upit treba da vrati
+	// "OFFSET" - preskače određeni broj redova prije nego što se redovi iz trenutnog upita vrate
 	query := fmt.Sprintf(`
         SELECT id, created_at, title, year, runtime, genres, version
         FROM movies
         WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
         AND (genres @> $2 OR $2 = '{}')     
-        ORDER BY %s %s, id ASC`, filters.sortColumn(), filters.sortDirection())
+        ORDER BY %s %s, id ASC
+        LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	// "placeholder" parametriće biti stavljeni u jedan "slice"
+	args := []any{title, pq.Array(genres), filters.limit(), filters.offset()}
+
 	// "QueryContext" metoda će vratiti "sql.Rows resultset" - koji sadrži rezultat
-	// u ovu metodu će se proslijediti "title" i "genres" kao "placeholder parameter" vrijednosti
-	rows, err := m.DB.QueryContext(ctx, query, title, pq.Array(genres))
+	// u ovu metodu će se proslijediti "variadic" parametar "args"
+	rows, err := m.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
