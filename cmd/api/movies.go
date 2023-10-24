@@ -223,9 +223,12 @@ func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request
 	input.Filters.PageSize = app.readInt(qs, "page_size", 20, v)
 	// podrazumijevana vrijednost za sortiranje je "id" (ascending sortiranje preko "movie ID"-a)
 	input.Filters.Sort = app.readString(qs, "sort", "id")
+	// dodavanje podržanih "sort" vrijednosti za ovaj "endpoint"
+	input.Filters.SortSafeList = []string{"id", "title", "year", "runtime", "-id", "-title", "-year", "-runtime"}
 
-	// provjera da li ima grešaka u "Validator" instanci
-	if !v.Valid() {
+	// validacija nad "Filters" struct-om i provjera da li ima grešaka u "Validator" instanci
+	// ukoliko se pronađu greške, biće poslat odgovor sa njihovim sadržajem
+	if data.ValidateFilters(v, input.Filters); !v.Valid() {
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
