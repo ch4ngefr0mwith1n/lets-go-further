@@ -179,6 +179,59 @@ func (m MovieModel) Delete(id int64) error {
 	return nil
 }
 
+// ova metoda će vraćati "Movie" slice
+// ona će da prihvata razne "filter" parametre, iako ih na početku nećemo koristiti
+func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
+	query := `
+        SELECT id, created_at, title, year, runtime, genres, version
+        FROM movies
+        ORDER BY id`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// "QueryContext" metoda će vratiti "sql.Rows resultset" - koji sadrži rezultat
+	rows, err := m.DB.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	// prazan "slice" koji će sadržati filmove:
+	movies := []*Movie{}
+
+	// "rows.Next()" vrši iteraciju preko redova unutar "ResultSet"-a:
+	for rows.Next() {
+		// prazan "Movie" struct - kojiće sadržati podatke za individualne filmove
+		var movie Movie
+
+		// vrijednosti iz SQL reda se ubacuju u "Movie" struct
+		err := rows.Scan(
+			&movie.ID,
+			&movie.CreatedAt,
+			&movie.Title,
+			&movie.Year,
+			&movie.Runtime,
+			pq.Array(&movie.Genres),
+			&movie.Version,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		movies = append(movies, &movie)
+	}
+
+	// nakon završetka "rows.Next()" petlje, poziva se "rows.Err()" kako bi se vratila greška ukoliko je došlo do nje
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return movies, nil
+}
+
 func ValidateMovie(v *validator.Validator, movie *Movie) {
 	v.Check(movie.Title != "", "title", "must be provided")
 	v.Check(len(movie.Title) <= 500, "title", "must not be more than 500 bytes long")
