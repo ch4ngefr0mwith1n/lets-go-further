@@ -182,16 +182,25 @@ func (m MovieModel) Delete(id int64) error {
 // ova metoda će vraćati "Movie" slice
 // ona će da prihvata razne "filter" parametre, iako ih na početku nećemo koristiti
 func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
+	// oba filtera će biti "optional" ('' ili '{}')
+	// "@>" predstavlja "contained by" operator u PostgreSQL
+	//
+	// unutar "listMovies" handler-a imamo sledeće "default" vrijednosti:
+	// input.Title = app.readString(qs, "title", "")
+	// input.Genres = app.readCSV(qs, "genres", []string{})
 	query := `
         SELECT id, created_at, title, year, runtime, genres, version
         FROM movies
+        WHERE (LOWER(title) = LOWER($1) OR $1 = '') 
+        AND (genres @> $2 OR $2 = '{}')     
         ORDER BY id`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	// "QueryContext" metoda će vratiti "sql.Rows resultset" - koji sadrži rezultat
-	rows, err := m.DB.QueryContext(ctx, query)
+	// u ovu metodu će se proslijediti "title" i "genres" kao "placeholder parameter" vrijednosti
+	rows, err := m.DB.QueryContext(ctx, query, title, pq.Array(genres))
 	if err != nil {
 		return nil, err
 	}
