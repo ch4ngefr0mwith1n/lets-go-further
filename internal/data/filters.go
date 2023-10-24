@@ -1,6 +1,9 @@
 package data
 
-import validator "greenlight.lazarmrkic.com/internal"
+import (
+	validator "greenlight.lazarmrkic.com/internal"
+	"strings"
+)
 
 // "page" / "page_size" i "sort" su parametri koje ćemo koristiti i na drugim "endpoint"-ovima
 // zbog toga ćemo ih staviti u "Filters" struct
@@ -21,4 +24,27 @@ func ValidateFilters(v *validator.Validator, f Filters) {
 
 	// provjera da li se "sort" parametri nalaze u okviru "safe list" vrijednosti
 	v.Check(validator.PermittedValue(f.Sort, f.SortSafeList...), "sort", "invalid sort value")
+}
+
+// "sortColumn()" i "sortDirection()" helper metode transformišu "query string" vrijednost (recimo "-year") u vrijednosti koje možemo da koristimo unutar SQL "query"-ja
+//
+// provjera da li klijentsko "Sort" polje postoji unutar "safelist"
+// ukoliko postoji, onda se vadi naziv kolone iz "Sort" polja i uklanja se "-" karakter (ukoliko on postoji)
+func (f Filters) sortColumn() string {
+	for _, safeValue := range f.SortSafeList {
+		if f.Sort == safeValue {
+			return strings.TrimPrefix(f.Sort, "-")
+		}
+	}
+
+	panic("unsafe sort parameter: " + f.Sort)
+}
+
+// vraća se smjer sortiranja ("ASC" ili "DESC"), u zavisnosti od "prefix" karaktera unutar "Sort" polja
+func (f Filters) sortDirection() string {
+	if strings.HasPrefix(f.Sort, "-") {
+		return "DESC"
+	}
+
+	return "ASC"
 }
