@@ -185,13 +185,18 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 	// oba filtera će biti "optional" ('' ili '{}')
 	// "@>" predstavlja "contained by" operator u PostgreSQL
 	//
+	// PostgreSQL FULL TEXT SEARCH ("Natural Language Search")
+	// unutar ove metode mora biti podržana i parcijalna pretraga ("partial matches")
+	// "(to_tsvector('simple', title)" - recimo, "The Breakfast Club" će biti razbijen na "breakfast", "club" i "the"
+	// "plainto_tsquery('simple', $1)" - "formatted query term" koji PostgreSQL "full search" može da razumije, recimo "The Club" postaje 'the' & 'club'
+	//
 	// unutar "listMovies" handler-a imamo sledeće "default" vrijednosti:
 	// input.Title = app.readString(qs, "title", "")
 	// input.Genres = app.readCSV(qs, "genres", []string{})
 	query := `
         SELECT id, created_at, title, year, runtime, genres, version
         FROM movies
-        WHERE (LOWER(title) = LOWER($1) OR $1 = '') 
+        WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
         AND (genres @> $2 OR $2 = '{}')     
         ORDER BY id`
 
