@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // ukoliko se desi neki "panic", njega će automatski da uhvati "http.Server"
@@ -38,15 +39,45 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 // za svaki prateći "request", izvadićemo klijentov "rate limiter" iz mape i provjeriti da li njegov "request" treba da se odobri
 // to se radi pozivom "Allow()" metode
 func (app *application) rateLimit(next http.Handler) http.Handler {
+	// ovaj "struct" će sadržati "rate limiter" i "last seen" za svakog klijenta
+	type client struct {
+		limiter  *rate.Limiter
+		lastSeen time.Time
+	}
+
 	var (
-		// mapa koja sadrži klijentske IP adrese i "rate limiter"-e
-		clients = make(map[string]*rate.Limiter)
+		// mapa koja sadrži klijentske IP adrese i klijente (unutar kojih je "rate limiter")
+		clients = make(map[string]*client)
 		// mapa kao struktura podataka nije sigurna za "concurrent use"
 		// "rateLimit()" middleware može da se izvršava u više "gouroutine"-a u isto vrijeme
 		// takođe, Golang-ov server za svaki HTTP "request" ima poseban "goroutine"
 		// zbog toga, preko "mutex"-a će se uvesti ograničenje - samo jedan "goroutine" može da čita vrijednosti iz mape ili da upisuje u nju
+		// (a mutual exclusion lock)
 		mu sync.Mutex
 	)
+
+	// "goroutine" koji se izvršava u pozadini
+	// uklanja na svaki minut stare unose iz "clients" mape
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+
+			// zaključavanje "mutex"-a
+			// treba spriječiti "rate limiter" provjere sve dok se vrši "clean-up"
+			mu.Lock()
+
+			// iteracija preko svih klijenata
+			// ukoliko nisu pristupali resursima u zadnja 3 minuta, onda unos treba da se izbriše iz mape
+			for ip, client := range clients {
+				if time.Since(client.lastSeen) > 3*time.Minute {
+					delete(clients, ip)
+				}
+			}
+
+			// otključavanje "mutex"-a nakon što se čišćenje završi
+			mu.Unlock()
+		}
+	}()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// vadi se klijentska IP adresa iz "request"-a
@@ -61,16 +92,27 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 		mu.Lock()
 
 		// provjera da li IP adresa postoji unutar mape
-		// ukoliko ne, inicijalizuje se novi "rate limiter" i dodaje se u mapu skupa sa povezanom IP adresom
+		// ukoliko ne, inicijalizuje se novi klijent (unutar kog su "limiter" i "last seen") i dodaje se u mapu skupa sa povezanom IP adresom
 		if _, found := clients[ip]; !found {
-			clients[ip] = rate.NewLimiter(2, 4)
+			clients[ip] = &client{limiter: rate.NewLimiter(2, 4)}
 		}
 
-		if !clients[ip].Allow() {
+		// ažuriranje "last seen" vremena
+		clients[ip].lastSeen = time.Now()
+
+		// za trenutnu IP adresu se poziva "Allow()" metoda
+		// ukoliko "request" nije dozvoljen, "mutex" se otključava i na kraju se šalje "429 Too Many Requests" odgovor
+		if !clients[ip].limiter.Allow() {
 			mu.Unlock()
 			app.rateLimitExceededResponse(w, r)
 			return
 		}
 
+		// BITNO:
+		// "mutex" treba da se otključa prije poziva narednog "handler"-a u lancu
+		// ne poziva se "defer", zato što "mutex" ne bi bio otključan dok svi "handler"-i ispod ovog "middleware"-a ne bi bili otključani
+		mu.Unlock()
+
+		next.ServeHTTP(w, r)
 	})
 }
