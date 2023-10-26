@@ -80,38 +80,43 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 	}()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// vadi se klijentska IP adresa iz "request"-a
-		// "_" bi predstavljao "port" iz adrese
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			app.serverErrorResponse(w, r, err)
-			return
-		}
+		// "rate limit" provjera se vrši samo ako je "rate limiting" omogućen:
+		if app.config.limiter.enabled {
+			// vadi se klijentska IP adresa iz "request"-a
+			// "_" bi predstavljao "port" iz adrese
+			ip, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				app.serverErrorResponse(w, r, err)
+				return
+			}
 
-		//zaključavanje "mutex"-a, kako se ovaj kod ne bi izvšavao konkurentno
-		mu.Lock()
+			//zaključavanje "mutex"-a, kako se ovaj kod ne bi izvšavao konkurentno
+			mu.Lock()
 
-		// provjera da li IP adresa postoji unutar mape
-		// ukoliko ne, inicijalizuje se novi klijent (unutar kog su "limiter" i "last seen") i dodaje se u mapu skupa sa povezanom IP adresom
-		if _, found := clients[ip]; !found {
-			clients[ip] = &client{limiter: rate.NewLimiter(2, 4)}
-		}
+			// provjera da li IP adresa postoji unutar mape
+			// ukoliko ne, inicijalizuje se novi klijent (unutar kog su "limiter" i "last seen") i dodaje se u mapu skupa sa povezanom IP adresom
+			if _, found := clients[ip]; !found {
+				clients[ip] = &client{
+					limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst),
+				}
+			}
 
-		// ažuriranje "last seen" vremena
-		clients[ip].lastSeen = time.Now()
+			// ažuriranje "last seen" vremena
+			clients[ip].lastSeen = time.Now()
 
-		// za trenutnu IP adresu se poziva "Allow()" metoda
-		// ukoliko "request" nije dozvoljen, "mutex" se otključava i na kraju se šalje "429 Too Many Requests" odgovor
-		if !clients[ip].limiter.Allow() {
+			// za trenutnu IP adresu se poziva "Allow()" metoda
+			// ukoliko "request" nije dozvoljen, "mutex" se otključava i na kraju se šalje "429 Too Many Requests" odgovor
+			if !clients[ip].limiter.Allow() {
+				mu.Unlock()
+				app.rateLimitExceededResponse(w, r)
+				return
+			}
+
+			// BITNO:
+			// "mutex" treba da se otključa prije poziva narednog "handler"-a u lancu
+			// ne poziva se "defer", zato što "mutex" ne bi bio otključan dok svi "handler"-i ispod ovog "middleware"-a ne bi bili otključani
 			mu.Unlock()
-			app.rateLimitExceededResponse(w, r)
-			return
 		}
-
-		// BITNO:
-		// "mutex" treba da se otključa prije poziva narednog "handler"-a u lancu
-		// ne poziva se "defer", zato što "mutex" ne bi bio otključan dok svi "handler"-i ispod ovog "middleware"-a ne bi bili otključani
-		mu.Unlock()
 
 		next.ServeHTTP(w, r)
 	})
