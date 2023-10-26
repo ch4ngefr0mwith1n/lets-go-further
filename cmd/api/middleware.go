@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"golang.org/x/time/rate"
 	"net/http"
 )
 
@@ -26,6 +27,21 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 			}
 		}()
 		// pozivanje narednog "middleware"-a u lancu:
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *application) rateLimit(next http.Handler) http.Handler {
+	// inicijalizuje se "rate limiter"
+	// on dozvoljava 2 "request"-a po sekundi sa maksimalno 4 "request"-a u jednom "burst"-u
+	limiter := rate.NewLimiter(2, 4)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !limiter.Allow() {
+			app.rateLimitExceededResponse(w, r)
+			return
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }
