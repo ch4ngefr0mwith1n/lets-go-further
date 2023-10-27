@@ -16,11 +16,13 @@ var (
 // imaće funkciju "container"-a i biće pogodan za našu svrhu, jer će biti dosta modela kako aplikacija bude rasla
 type Models struct {
 	Movies MovieModel
+	Users  UserModel
 }
 
 // ova metoda vraća "Models" struct koji sadrži INICIJALIZOVAN "MovieModel"
 func NewModels(db *sql.DB) Models {
 	return Models{
 		Movies: MovieModel{DB: db},
+		Users:  UserModel{DB: db},
 	}
 }
