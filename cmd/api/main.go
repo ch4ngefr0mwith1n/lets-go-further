@@ -83,15 +83,18 @@ func main() {
 	defer db.Close()
 	logger.Info("database connection pool established")
 
-	app := application{
+	app := &application{
 		config: cfg,
 		logger: logger,
 		models: data.NewModels(db),
 	}
 
+	// pokretanje servera:
 	err = app.serve()
-	logger.Error(err.Error())
-	os.Exit(1)
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
 }
 
 func openDB(cfg config) (*sql.DB, error) {
