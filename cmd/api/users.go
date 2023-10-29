@@ -57,18 +57,22 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// ispisivanje JSON odgovora koji sadrži podatke o korisniku, skupa sa "201 Created" status kodom:
-	err = app.writeJSON(w, http.StatusCreated, envelope{"user": user}, nil)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-	}
+	// slanje "welcome" email-a može značajno da uveća latenciju za "request/response" ciklus
+	// zbog toga, slanje email-a treba izdvojiti u zasebnu "gouroutine"-u
+	// ona će da se izvršava PARALELNO sa pratećim kodom
+	// odnosno, mogli bismo da vratimo HTTP response klijentu bez čekanja na slanje email-a
+	// pozadinski "gorotuine" će da se izvršava još dugo nakon vraćanja JSON-a
+	//
+	// pokretanje "goroutine" - koja pokreće anonimnu funkciju koja šalje "welcome" email:
+	app.background(func() {
+		err = app.mailer.Send(user.Email, "user_welcome.tmpl", user)
+		if err != nil {
+			app.logger.Error(err.Error())
+		}
+	})
 
-	err = app.mailer.Send(user.Email, "user_welcome.tmpl", user)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return
-	}
-
+	// ispisivanje JSON odgovora koji sadrži podatke o korisniku, skupa sa "202 Accepted" status kodom
+	// to znači da smo "request" prihvatili za procesuiranje i da se ono još uvijek nije završilo
 	err = app.writeJSON(w, http.StatusCreated, envelope{"user": user}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
