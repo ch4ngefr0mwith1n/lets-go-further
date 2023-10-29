@@ -14,7 +14,7 @@ import (
 // sav sadržaj "./templates" direktorijuma će automatski biti učitan u ovu promjenjivu
 // ↓↓↓
 
-//go:embed "templates"
+// / go:embed "templates"
 var templateFS embed.FS
 
 type Mailer struct {
@@ -76,9 +76,17 @@ func (m Mailer) Send(recipient string, templateFile string, data any) error {
 
 	// "DialAndSend()" metoda otvara konekciju ka SMTP serveru, šalje poruku i nakon toga zatvara konekciju
 	// ukoliko istekne "timeout", onda će vratiti "dial tcp: i/o timeout" grešku
-	err = m.dialer.DialAndSend(msg)
-	if err != nil {
-		return err
+	// postojaće tri pokušaja da se pošalje mejl prije odustajanja i slanja zadnje greške
+	// biće čekanje od 500 milisekundi između pokušaja
+	for i := 1; i <= 3; i++ {
+		err = m.dialer.DialAndSend(msg)
+		// If everything worked, return nil.
+		if nil == err {
+			return nil
+		}
+
+		// If it didn't work, sleep for a short time and retry.
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	return nil
