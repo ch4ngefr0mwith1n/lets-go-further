@@ -3,14 +3,18 @@ package mailer
 import (
 	"bytes"
 	"embed"
-	"github.com/go-mail/mail/v2"
 	"html/template"
 	"time"
+
+	"github.com/go-mail/mail/v2"
 )
 
 // ova promjenjiva je "embed.FS" tipa (embedded file system)
 // unutar nje će se nalaziti "email" templejti
 // sav sadržaj "./templates" direktorijuma će automatski biti učitan u ovu promjenjivu
+// ↓↓↓
+
+//go:embed "templates"
 var templateFS embed.FS
 
 type Mailer struct {
@@ -20,7 +24,7 @@ type Mailer struct {
 	sender string
 }
 
-func New(host string, port int, username string, password string, sender string) Mailer {
+func New(host string, port int, username, password, sender string) Mailer {
 	// inicijalizuje se "mail.Dialer()" instanca sa zadatim SMTP podešavanjima
 	dialer := mail.NewDialer(host, port, username, password)
 	// koristiće se "timeout" od 5 sekundi svaki put kada pošaljemo e-mail
