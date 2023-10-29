@@ -193,3 +193,19 @@ func (app *application) readInt(qs url.Values, key string, defaultValue int, v *
 
 	return i
 }
+
+// ova funkcija služi za "panic recovery"
+// ona koristi "recover()" da uhvati svaki "panic" i da izvrši logovanje "error" poruke umjesto direktnog gašenja aplikacije
+func (app *application) background(fn func()) {
+	// pokretanje "goroutine" u pozadini:
+	go func() {
+		// "recover" proces za svaki "panic"
+		defer func() {
+			if err := recover(); err != nil {
+				app.logger.Error(fmt.Sprintf("%v", err))
+			}
+		}()
+		// izvršavanje proizvoljne funkcije iz parametra:
+		fn()
+	}()
+}
