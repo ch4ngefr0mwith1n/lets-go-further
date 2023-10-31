@@ -14,7 +14,7 @@ import (
 // sav sadržaj "./templates" direktorijuma će automatski biti učitan u ovu promjenjivu
 // ↓↓↓
 
-// / go:embed "templates"
+//go:embed "templates"
 var templateFS embed.FS
 
 type Mailer struct {
@@ -80,7 +80,7 @@ func (m Mailer) Send(recipient string, templateFile string, data any) error {
 	// biće čekanje od 500 milisekundi između pokušaja
 	for i := 1; i <= 3; i++ {
 		err = m.dialer.DialAndSend(msg)
-		// If everything worked, return nil.
+		// ukoliko sve radi, vratiće se "nil"
 		if nil == err {
 			return nil
 		}
