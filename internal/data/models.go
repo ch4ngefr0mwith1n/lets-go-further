@@ -17,6 +17,7 @@ var (
 type Models struct {
 	Movies MovieModel
 	Users  UserModel
+	Tokens TokenModel
 }
 
 // ova metoda vraća "Models" struct koji sadrži INICIJALIZOVAN "MovieModel"
@@ -24,5 +25,6 @@ func NewModels(db *sql.DB) Models {
 	return Models{
 		Movies: MovieModel{DB: db},
 		Users:  UserModel{DB: db},
+		Tokens: TokenModel{DB: db},
 	}
 }
