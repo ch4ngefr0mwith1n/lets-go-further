@@ -14,7 +14,7 @@ import (
 // sav sadržaj "./templates" direktorijuma će automatski biti učitan u ovu promjenjivu
 // ↓↓↓
 
-// / go:embed "templates"
+//go:embed "templates"
 var templateFS embed.FS
 
 type Mailer struct {
