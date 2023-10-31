@@ -94,3 +94,70 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Request) {
+	// korisnik preko "PUT request"-a šalje "plaintext activation token
+	// ukoliko pošaljemo više "PUT request"-ova jedan za drugim, onda će samo prvi da ima efekta (ukoliko je token validan)
+	//
+	var input struct {
+		TokenPlaintext string `json:"token"`
+	}
+
+	err := app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	// validacija "plaintext" tokena kog korisnik šalje:
+	v := validator.New()
+
+	if data.ValidateTokenPlaintext(v, input.TokenPlaintext); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	// vađenje detalja o korisniku za kog je vezan "plaintext" token
+	// ukoliko se ne nađe nijedan korisnik, korisnik dobija povratnu informaciju da token nije validan
+	user, err := app.models.Users.GetForToken(data.ScopeActivation, input.TokenPlaintext)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			v.AddError("token", "invalid or expired activation token")
+			app.failedValidationResponse(w, r, v.Errors)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	// ažuriranje "Activated" statusa za datog korisnika:
+	user.Activated = true
+
+	// čuvanje ažuriranog korisnika u bazi i provjera da li postoje neki "edit" konflikti
+	// koristi se isti pristup kao za "movie" podatke
+	err = app.models.Users.Update(user)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	// ukoliko je sve prošlo kako treba, onda brišemo sve aktivacione tokene za datog korisnika:
+	err = app.models.Tokens.DeleteAllForUser(data.ScopeActivation, user.ID)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// slanje JSON-a sa ažuriranim podacima o korisniku:
+	err = app.writeJSON(w, http.StatusOK, envelope{"user": user}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+
+}
