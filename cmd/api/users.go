@@ -5,6 +5,7 @@ import (
 	validator "greenlight.lazarmrkic.com/internal"
 	"greenlight.lazarmrkic.com/internal/data"
 	"net/http"
+	"time"
 )
 
 // "registerUserHandler" treba da kreira novi "User" struct, koji sadrži podatke poslate na "endpoint"
@@ -57,6 +58,13 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// nakon što se korisnik kreira u bazi, za njega treba generisati "activation token"
+	token, err := app.models.Tokens.New(user.ID, 3*24*time.Hour, data.ScopeActivation)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
 	// slanje "welcome" email-a može značajno da uveća latenciju za "request/response" ciklus
 	// zbog toga, slanje email-a treba izdvojiti u zasebnu "gouroutine"-u
 	// ona će da se izvršava PARALELNO sa pratećim kodom
@@ -65,7 +73,15 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	//
 	// pokretanje "goroutine" - koja pokreće anonimnu funkciju koja šalje "welcome" email:
 	app.background(func() {
-		err = app.mailer.Send(user.Email, "user_welcome.tmpl", user)
+		// trenutno postoji više podataka koje trebamo da proslijedimo u "email" šablone
+		// zbog toga ćemo da kreiramo mapu koja će da čuva ove podatke
+		data := map[string]any{
+			"activationToken": token.Plaintext,
+			"userID":          user.ID,
+		}
+
+		// slanje "welcome" mejla, a mapa se prosljeđuje kao "dynamic" podatak:
+		err = app.mailer.Send(user.Email, "user_welcome.tmpl", data)
 		if err != nil {
 			app.logger.Error(err.Error())
 		}
