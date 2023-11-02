@@ -182,3 +182,35 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 
 	})
 }
+
+func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+
+		if user.IsAnonymous() {
+			app.authenticationRequiredResponse(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// moguće je kombinovati dva "middleware"-a
+// odnosno, provjera da li je korisnik prošao autentifikaciju i aktivaciju naloga:
+func (app *application) requireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+
+		// provjera da li je korisnik aktivirao nalog:
+		if !user.Activated {
+			app.inactiveAccountResponse(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+
+	// kad se poziva "middleware" za aktivaciju, prvo će se pozvati "middleware" za autentifikaciju:
+	return app.requireAuthenticatedUser(fn)
+}
