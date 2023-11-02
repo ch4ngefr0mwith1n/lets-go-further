@@ -15,16 +15,18 @@ var (
 // unutar ovog "struct"-a ćemo čuvati sve modele
 // imaće funkciju "container"-a i biće pogodan za našu svrhu, jer će biti dosta modela kako aplikacija bude rasla
 type Models struct {
-	Movies MovieModel
-	Users  UserModel
-	Tokens TokenModel
+	Users       UserModel
+	Permissions PermissionModel
+	Movies      MovieModel
+	Tokens      TokenModel
 }
 
 // ova metoda vraća "Models" struct koji sadrži INICIJALIZOVAN "MovieModel"
 func NewModels(db *sql.DB) Models {
 	return Models{
-		Movies: MovieModel{DB: db},
-		Users:  UserModel{DB: db},
-		Tokens: TokenModel{DB: db},
+		Users:       UserModel{DB: db},
+		Permissions: PermissionModel{DB: db},
+		Movies:      MovieModel{DB: db},
+		Tokens:      TokenModel{DB: db},
 	}
 }
