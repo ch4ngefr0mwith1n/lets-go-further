@@ -1,10 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"golang.org/x/time/rate"
+	validator "greenlight.lazarmrkic.com/internal"
+	"greenlight.lazarmrkic.com/internal/data"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -119,5 +123,62 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 		}
 
 		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *application) authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// dodaje se "Vary:Authorization" header na svaki odgovor
+		// to je indikator da odgovor može da varira u zavisnosti od vrijednosti vezane za "Authorization" header unutar "request"-a
+		w.Header().Add("Vary", "Authorization")
+
+		// vađenje vrijednosti koja je vezana za "Authorization" header unutar "request"-a:
+		authorizationHeader := r.Header.Get("Authorization")
+
+		// ukoliko ne postoji "Authorization" header, onda koristimo "contextSetUser()" helper metodu
+		// ona stavlja "AnonymousUser"-a u "request context"
+		// nakon toga, možemo pozvati naredni "handler" u lancu i sav naredni kod ne mora da se izvršava:
+		if authorizationHeader == "" {
+			r := app.contextSetUser(r, data.AnonymousUser)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// vrijednost "Authorization" header-a treba da bude u formatu "Bearer <token>"
+		// pokušavamo da rasturimo ovaj string na dva dijela i ukoliko "header" nije u ispravnom formatu - vratiće se "401 Unauthorized"
+		headerParts := strings.Split(authorizationHeader, " ")
+		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		// vađenje konkretne vrijednosti vezane za token:
+		token := headerParts[1]
+
+		v := validator.New()
+		// provjera da li je token u ispravnom formatu:
+		if data.ValidateTokenPlaintext(v, token); !v.Valid() {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		// vraćanje detalja o korisniku na osnovu "authentication" tokena:
+		user, err := app.models.Users.GetForToken(data.ScopeAuthentication, token)
+		if err != nil {
+			switch {
+			case errors.Is(err, data.ErrRecordNotFound):
+				app.invalidAuthenticationTokenResponse(w, r)
+			default:
+				app.serverErrorResponse(w, r, err)
+			}
+			return
+		}
+
+		// dodavanje informacija o korisniku preko "contextSetUser" metode:
+		r = app.contextSetUser(r, user)
+
+		// pozivanje narednog "handler"-a u lancu:
+		next.ServeHTTP(w, r)
+
 	})
 }
