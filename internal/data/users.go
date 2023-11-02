@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+// definisanje anonimnog korisnika
+// predstavlja "inactive" korisnika koji nema "ID" / "name" / "email" / "password"
+var AnonymousUser = &User{}
+
 // koristimo `json:"-"` za polja koja ne trebaju da se prikazuju u JSON output-u
 type User struct {
 	ID        int64     `json:"id"`
@@ -37,6 +41,15 @@ type password struct {
 var (
 	ErrDuplicateEmail = errors.New("duplicate email")
 )
+
+// provjera da li je instanca "User"-a zapravo "AnonymousUser"
+//
+// data.AnonymousUser.IsAnonymous() // → Returns true
+// otherUser := &data.User{}
+// otherUser.IsAnonymous()          // → Returns false
+func (u *User) IsAnonymous() bool {
+	return u == AnonymousUser
+}
 
 // "Set()" metoda računa "bcrypt hash" na osnovu "plaintext" lozinke
 // nakon toga, čuvaće obje vrijednosti ("plaintext" & "hash") unutar "struct"-a
