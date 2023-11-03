@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"github.com/lib/pq"
 	"time"
 )
 
@@ -62,4 +63,18 @@ func (m PermissionModel) GetAllPermissionsForUser(userID int64) (Permissions, er
 	}
 
 	return permissions, nil
+}
+
+// metoda koja dodaje "permissions" za određenog korisnika
+// koristi se "variadic" parametar, preko kog možemo dodati više "permission"-a odjednom
+func (m PermissionModel) AddPermissionForUser(userID int64, codes ...string) error {
+	query := `
+        INSERT INTO users_permissions
+        SELECT $1, permissions.id FROM permissions WHERE permissions.code = ANY($2)`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, err := m.DB.ExecContext(ctx, query, userID, pq.Array(codes))
+	return err
 }

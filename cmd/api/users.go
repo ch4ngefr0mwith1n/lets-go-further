@@ -58,6 +58,13 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// prilikom registracije, dodaće se "movies:read" permission za novog korisnika:
+	err = app.models.Permissions.AddPermissionForUser(user.ID, "movies:read")
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
 	// nakon što se korisnik kreira u bazi, za njega treba generisati "activation token"
 	token, err := app.models.Tokens.New(user.ID, 3*24*time.Hour, data.ScopeActivation)
 	if err != nil {
