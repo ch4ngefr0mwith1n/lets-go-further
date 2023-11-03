@@ -215,6 +215,10 @@ func (app *application) requireActivatedUser(next http.HandlerFunc) http.Handler
 	return app.requireAuthenticatedUser(fn)
 }
 
+// ovaj "middleware" za parametar prihvata određeni "permission code" (recimo, "movies:read")
+// vezujemo ga za neku rutu u "router"-u
+// iz trenutnog "request"-a vadimo "user"-a, uzimamo "permissions" koje su vezane uz njega
+// na kraju, provjeravamo da li "permissions" slice sadrži "permission code" iz parametra
 func (app *application) requirePermission(code string, next http.HandlerFunc) http.HandlerFunc {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		user := app.contextGetUser(r)
