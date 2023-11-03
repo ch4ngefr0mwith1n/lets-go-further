@@ -214,3 +214,26 @@ func (app *application) requireActivatedUser(next http.HandlerFunc) http.Handler
 	// kad se poziva "middleware" za aktivaciju, prvo će se pozvati "middleware" za autentifikaciju:
 	return app.requireAuthenticatedUser(fn)
 }
+
+func (app *application) requirePermission(code string, next http.HandlerFunc) http.HandlerFunc {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+
+		permissions, err := app.models.Permissions.GetAllPermissionsForUser(user.ID)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+
+		// ukoliko se unutar "permissions" slice-a ne nalazi određeni "permission code", onda ćemo baciti grešku
+		if !permissions.Include(code) {
+			app.notPermittedResponse(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
+
+	// autentifikacija → aktiviran nalog → odgovarajući "permission code":
+	return app.requireActivatedUser(fn)
+}
